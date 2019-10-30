@@ -1,5 +1,6 @@
 [package]
-name = "hl7-mllp-rs"
+name = "hl7-mllp-codec"
+description = "A Tokio codec for HL7 Minimal Lower Layer Message Transport protocol (MLLP)"
 version = "0.1.0"
 authors = ["wokket <wokket@gmail.com>"]
 edition = "2018"
