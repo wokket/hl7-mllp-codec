@@ -39,6 +39,7 @@ impl Encoder for MllpCodec {
 
 		buf.extend_from_slice(&MllpCodec::BLOCK_FOOTER); //footer
 
+		println!("Encoded value for send: '{:?}'", buf);
 		Ok(())
 	}
 }
@@ -60,10 +61,11 @@ impl Decoder for MllpCodec {
 			println!("Found message header at index {}", start_offset);
 
 			if let Some(end_offset) = MllpCodec::get_footer_position(src) {
+				//TODO: Is it worth passing a slice of src so we don't search the header chars?  Most of the time the start_offset == 0, so not sure it's worth it.
 				println!("Found message footer at index {}", end_offset);
 
-				let result = src.split_to(end_offset); // grab our data from the buffer
-				let result = &result[start_offset + 1..]; //remove the header
+				let result = src.split_to(end_offset + 2); // grab our data from the buffer including the footer
+				let result = &result[start_offset + 1..&result.len() - 2]; //remove the header and footer
 				let return_buf = BytesMut::from(result);
 				return Ok(Some(return_buf));
 			}
@@ -73,6 +75,7 @@ impl Decoder for MllpCodec {
 	}
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -148,6 +151,22 @@ mod tests {
 			}
 			_ => assert!(false, "Failure for message with illegal trailing data"),
 		}
+	}
+
+	#[test]
+	fn ensure_no_data_is_left_on_the_stream() {
+		// we get errors from the tokio stuff if we close a connection with data still sitting unread on the stream.
+		// Ensure we remove it all as part of the decoder
+		let mut data = BytesMut::from("\x0BTest Data\x1C\x0D");
+		let mut m = MllpCodec::new();
+
+		let _result = m.decode(&mut data);
+
+		assert_eq!(
+			data.len(),
+			0,
+			"Decoder left data sitting in the buffer after read!"
+		);
 	}
 
 	#[test]
