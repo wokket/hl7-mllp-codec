@@ -1,6 +1,5 @@
 
 use bytes::*;
-use std::error::Error;
 use tokio;
 use tokio::codec::Framed;
 use tokio::net::TcpStream;
