@@ -39,7 +39,7 @@ impl Encoder for MllpCodec {
 
 		buf.extend_from_slice(&MllpCodec::BLOCK_FOOTER); //footer
 
-		println!("Encoded value for send: '{:?}'", buf);
+		//println!("Encoded value for send: '{:?}'", buf);
 		Ok(())
 	}
 }
@@ -49,7 +49,7 @@ impl Decoder for MllpCodec {
 	type Error = std::io::Error; // Just to get rolling, custom error type later when needed.
 
 	fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-		// We're lucky hte MLLP is specced as synchronous, and requires an ACK before sending the
+		// We're lucky the MLLP is specced as synchronous, and requires an ACK before sending the
 		//next message, so we don't have to worry about multiple messages in the buffer.
 
 		// we DO have to ignore any bytes prior to the BLOCK_HEADER
@@ -58,11 +58,11 @@ impl Decoder for MllpCodec {
 		if let Some(start_offset) = src.iter().position(|b| *b == MllpCodec::BLOCK_HEADER) {
 			//yes we do, do we have a footer?
 
-			println!("Found message header at index {}", start_offset);
+			//println!("Found message header at index {}", start_offset);
 
 			if let Some(end_offset) = MllpCodec::get_footer_position(src) {
 				//TODO: Is it worth passing a slice of src so we don't search the header chars?  Most of the time the start_offset == 0, so not sure it's worth it.
-				println!("Found message footer at index {}", end_offset);
+				//println!("Found message footer at index {}", end_offset);
 
 				let result = src.split_to(end_offset + 2); // grab our data from the buffer including the footer
 				let result = &result[start_offset + 1..&result.len() - 2]; //remove the header and footer
