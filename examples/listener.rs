@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 				Ok(message) => {
 					// Large console output remmed out to test throughput.  Feel free to unrem for better  diagnostic output.
 					//println!("Got message: {:?}", message);
-					print!(".");
+					print!("*");
 
 					//TODO: If this was for-real, you'd hand the message off to a HL7 Parser or database somewhere
 
