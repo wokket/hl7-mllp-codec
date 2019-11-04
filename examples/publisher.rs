@@ -6,7 +6,6 @@ use tokio;
 use tokio::codec::Framed;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
-use std::time::Instant;
 
 use hl7_mllp_codec::MllpCodec;
 
