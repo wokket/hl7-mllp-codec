@@ -1,3 +1,8 @@
+//! This is an example of a HL7 Listener service, which
+//! is listening on 127.0.0.1:8080 for inbound HL7 messages over MLLP
+//!
+//! Use Interface Explorer or any other tool (netcat?) to punch data wrapped in MLLP bytes
+//! to this process, and the data is printed to the console.
 
 use bytes::*;
 use tokio;
