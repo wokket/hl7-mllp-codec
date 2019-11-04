@@ -9,6 +9,11 @@ repository = "https://github.com/wokket/hl7-mllp-codec"
 categories = ["asynchronous", "network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+include = [
+    "src/*.rs",
+    "Cargo.toml",
+]
+
 [dependencies]
 bytes = "0.4.12"
 tokio = "0.2.0-alpha.6"
