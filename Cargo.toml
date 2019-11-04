@@ -1,11 +1,12 @@
 [package]
 name = "hl7-mllp-codec"
 description = "A Tokio codec for HL7 Minimal Lower Layer Message Transport protocol (MLLP)"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["wokket <wokket@gmail.com>"]
 edition = "2018"
 license = "MIT"
 repository = "https://github.com/wokket/hl7-mllp-codec"
+documentation = "https://docs.rs/hl7-mllp-codec"
 categories = ["asynchronous", "network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
