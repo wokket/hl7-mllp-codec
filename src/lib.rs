@@ -131,7 +131,7 @@ impl Decoder for MllpCodec {
 			}
 		}
 
-		warn!("MLLP: Unable to find a message, but we're meant to b a synchronous protocol?");
+		trace!("MLLP: No clear header/footer available, waiting for more data.");
 		Ok(None) // no message lurking in here yet
 	}
 }
