@@ -15,6 +15,10 @@ include = [
     "Cargo.toml",
 ]
 
+[profile.release]
+debug = true # Flamegraph love
+
 [dependencies]
 bytes = "0.4.12"
 tokio = "0.2.0-alpha.6"
+log = "0.4"

@@ -47,6 +47,7 @@
 
 use bytes::buf::BufMut;
 use bytes::BytesMut;
+use log::{debug, error, info, trace, warn};
 use tokio::codec::*;
 
 /// See the [crate] documentation for better details.
@@ -71,10 +72,12 @@ impl MllpCodec {
 		for i in 0..src.len() - 1 {
 			// for all bytes up to 1 before the end
 			if src[i] == MllpCodec::BLOCK_FOOTER[0] && src[i + 1] == MllpCodec::BLOCK_FOOTER[1] {
+				trace!("MLLP: Found footer at index {}", i);
 				return Some(i);
 			}
 		}
 
+		trace!("MLLP: Unable to find footer...");
 		None
 	}
 }
@@ -86,7 +89,6 @@ impl Encoder for MllpCodec {
 	type Error = std::io::Error; // Just to get rolling, custom error type later when needed.
 
 	fn encode(&mut self, event: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
-		// do something here
 		buf.reserve(event.len() + 3); //we need an extra 3 bytes of space on top of the message proper
 		buf.put_u8(MllpCodec::BLOCK_HEADER); //header
 
@@ -94,7 +96,7 @@ impl Encoder for MllpCodec {
 
 		buf.extend_from_slice(&MllpCodec::BLOCK_FOOTER); //footer
 
-		//println!("Encoded value for send: '{:?}'", buf);
+		debug!("MLLP: Encoded value for send: '{:?}'", buf);
 		Ok(())
 	}
 }
@@ -107,7 +109,7 @@ impl Decoder for MllpCodec {
 
 	fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
 		// We're lucky the MLLP is specced as synchronous, and requires an ACK before sending the
-		//next message, so we don't have to worry about multiple messages in the buffer.
+		// next message, so we don't have to worry about multiple messages in the buffer.
 
 		// we DO have to ignore any bytes prior to the BLOCK_HEADER
 
@@ -115,19 +117,21 @@ impl Decoder for MllpCodec {
 		if let Some(start_offset) = src.iter().position(|b| *b == MllpCodec::BLOCK_HEADER) {
 			//yes we do, do we have a footer?
 
-			//println!("Found message header at index {}", start_offset);
+			trace!("MLLP: Found message header at index {}", start_offset);
 
 			if let Some(end_offset) = MllpCodec::get_footer_position(src) {
-				//TODO: Is it worth passing a slice of src so we don't search the header chars?  Most of the time the start_offset == 0, so not sure it's worth it.
-				//println!("Found message footer at index {}", end_offset);
+				//TODO: Is it worth passing a slice of src so we don't search the header chars?
+				//Most of the time the start_offset == 0, so not sure it's worth it.
 
 				let result = src.split_to(end_offset + 2); // grab our data from the buffer including the footer
 				let result = &result[start_offset + 1..&result.len() - 2]; //remove the header and footer
 				let return_buf = BytesMut::from(result);
+				debug!("MLLP: Received message: {:?}", return_buf);
 				return Ok(Some(return_buf));
 			}
 		}
 
+		warn!("MLLP: Unable to find a message, but we're meant to b a synchronous protocol?");
 		Ok(None) // no message lurking in here yet
 	}
 }
