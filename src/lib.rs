@@ -46,11 +46,12 @@
 //!}
 
 use bytes::buf::BufMut;
-use bytes::{Bytes, BytesMut};
-use log::{debug, error, info, trace, warn};
+use bytes::BytesMut;
+use log::{debug, trace};
 use tokio::codec::*;
 
 /// See the [crate] documentation for better details.
+#[derive(Default)]
 pub struct MllpCodec {}
 
 impl MllpCodec {
@@ -74,12 +75,13 @@ impl MllpCodec {
 			let cur = iter.next();
 			let next = iter.peek();
 
-			let fs = &MllpCodec::BLOCK_FOOTER[0];
-			let cr = &MllpCodec::BLOCK_FOOTER[1];
-
 			match (cur, next) {
 				(Some((_, cur_ele)), Some((i, next_ele))) => {
-					if cur_ele == cr && *next_ele == fs {
+					//both current and next ele are avail
+					if cur_ele == &MllpCodec::BLOCK_FOOTER[1]
+						&& *next_ele == &MllpCodec::BLOCK_FOOTER[0]
+					{
+						//if the bytes are our footer
 						let index = src.len() - i - 1; //need an extra byte removed
 						trace!("MLLP: Found footer at index {}", index);
 						return Some(index);
@@ -136,9 +138,6 @@ impl Decoder for MllpCodec {
 				//TODO: Is it worth passing a slice of src so we don't search the header chars?
 				//Most of the time the start_offset == 0, so not sure it's worth it.
 
-				// let result = src.split_to(end_offset + 2); // grab our data from the buffer including the footer
-				// let result = &result[start_offset + 1..&result.len() - 2]; //remove the header and footer
-
 				let mut result = src
 					.split_to(end_offset + 2) //get the footer bytes
 					.split_to(end_offset); // grab our data from the buffer, consuming (and losing) the footer
@@ -170,6 +169,11 @@ mod tests {
 	#[test]
 	fn can_construct_without_error() {
 		let _m = MllpCodec::new();
+	}
+
+	#[test]
+	fn implements_default() {
+		let _m = MllpCodec::default();
 	}
 
 	#[test]
