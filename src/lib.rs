@@ -101,15 +101,15 @@ impl Encoder for MllpCodec {
 	type Item = BytesMut; // For the moment all we do is return the underlying byte array, I'm not getting into message parsing here.
 	type Error = std::io::Error; // Just to get rolling, custom error type later when needed.
 
-	fn encode(&mut self, event: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
-		buf.reserve(event.len() + 3); //we need an extra 3 bytes of space on top of the message proper
-		buf.put_u8(MllpCodec::BLOCK_HEADER); //header
+	fn encode(&mut self, event: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+		dst.reserve(event.len() + 3); //we need an extra 3 bytes of space on top of the message proper
+		dst.put_u8(MllpCodec::BLOCK_HEADER); //header
 
-		buf.extend_from_slice(&event); //data
+		dst.put_slice(&event); //data
 
-		buf.extend_from_slice(&MllpCodec::BLOCK_FOOTER); //footer
+		dst.put_slice(&MllpCodec::BLOCK_FOOTER); //footer
 
-		debug!("MLLP: Encoded value for send: '{:?}'", buf);
+		debug!("MLLP: Encoded value for send: '{:?}'", dst);
 		Ok(())
 	}
 }
@@ -136,11 +136,15 @@ impl Decoder for MllpCodec {
 				//TODO: Is it worth passing a slice of src so we don't search the header chars?
 				//Most of the time the start_offset == 0, so not sure it's worth it.
 
-				let result = src.split_to(end_offset + 2); // grab our data from the buffer including the footer
-				let result = &result[start_offset + 1..&result.len() - 2]; //remove the header and footer
-				let return_buf = BytesMut::from(result);
-				debug!("MLLP: Received message: {:?}", return_buf);
-				return Ok(Some(return_buf));
+				// let result = src.split_to(end_offset + 2); // grab our data from the buffer including the footer
+				// let result = &result[start_offset + 1..&result.len() - 2]; //remove the header and footer
+
+				let mut result = src
+					.split_to(end_offset + 2) //get the footer bytes
+					.split_to(end_offset); // grab our data from the buffer, consuming (and losing) the footer
+				result.advance(start_offset + 1); //move to start of data
+				debug!("MLLP: Received message: {:?}", result);
+				return Ok(Some(result));
 			}
 		}
 
