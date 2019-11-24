@@ -46,7 +46,7 @@
 //!}
 
 use bytes::buf::BufMut;
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use log::{debug, error, info, trace, warn};
 use tokio::codec::*;
 
@@ -69,16 +69,29 @@ impl MllpCodec {
 	}
 
 	fn get_footer_position(src: &BytesMut) -> Option<usize> {
-		for i in 0..src.len() - 1 {
-			// for all bytes up to 1 before the end
-			if src[i] == MllpCodec::BLOCK_FOOTER[0] && src[i + 1] == MllpCodec::BLOCK_FOOTER[1] {
-				trace!("MLLP: Found footer at index {}", i);
-				return Some(i);
+		let mut iter = src.iter().rev().enumerate().peekable(); //search from end (footer should be right at the end)
+		loop {
+			let cur = iter.next();
+			let next = iter.peek();
+
+			let fs = &MllpCodec::BLOCK_FOOTER[0];
+			let cr = &MllpCodec::BLOCK_FOOTER[1];
+
+			match (cur, next) {
+				(Some((_, cur_ele)), Some((i, next_ele))) => {
+					if cur_ele == cr && *next_ele == fs {
+						let index = src.len() - i - 1; //need an extra byte removed
+						trace!("MLLP: Found footer at index {}", index);
+						return Some(index);
+					}
+				}
+				(_, None) => {
+					trace!("MLLP: Unable to find footer...");
+					return None;
+				}
+				_ => {} //keep looping
 			}
 		}
-
-		trace!("MLLP: Unable to find footer...");
-		None
 	}
 }
 
