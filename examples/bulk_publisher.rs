@@ -13,7 +13,7 @@ use hl7_mllp_codec::MllpCodec;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
  	// Open a TCP stream to the socket address.
     // Note that this is the Tokio TcpStream, which is fully async.
-    let stream = TcpStream::connect("10.0.75.1:3000").await?; //listener example, see listener.rs
+    let stream = TcpStream::connect("127.0.0.1:8080").await?; //listener example, see listener.rs
     println!("Connected to server...");
 
 	// Convert the raw TCP stream into a rich Framed stream, which 
