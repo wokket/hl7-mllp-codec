@@ -3,14 +3,14 @@
 
 use bytes::*;
 use tokio;
-use tokio::codec::Framed;
+use tokio_util::codec::Framed;
 use tokio::net::TcpStream;
-use tokio::prelude::*;
-
+use futures::{SinkExt, StreamExt};
 use hl7_mllp_codec::MllpCodec;
+use std::error::Error;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn Error>> {
  	// Open a TCP stream to the socket address.
     // Note that this is the Tokio TcpStream, which is fully async.
     let stream = TcpStream::connect("127.0.0.1:8080").await?; //listener example, see listener.rs

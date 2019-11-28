@@ -5,17 +5,17 @@
 //! to this process, and the data is printed to the console.
 
 use bytes::*;
+use futures::{SinkExt, StreamExt};
 use std::error::Error;
 use std::net::SocketAddr;
 use tokio;
-use tokio::codec::Framed;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::*;
+use tokio_util::codec::Framed;
 
 use hl7_mllp_codec::MllpCodec;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn Error>> {
 	let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
 	let mut listener = TcpListener::bind(&addr).await?;
 	println!("Listening on {}", addr);
@@ -36,10 +36,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 		while let Some(result) = transport.next().await {
 			match result {
-				Ok(message) => {
+				Ok(_message) => {
 					// Large console output remmed out to test throughput.  Feel free to unrem for better  diagnostic output.
 					//println!("Got message: {:?}", message);
-					print!("*");
+					//print!("*");
 
 					//TODO: If this was for-real, you'd hand the message off to a HL7 Parser or database somewhere
 

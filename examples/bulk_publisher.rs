@@ -2,9 +2,9 @@
 
 use bytes::*;
 use tokio;
-use tokio::codec::Framed;
+use tokio_util::codec::Framed;
 use tokio::net::TcpStream;
-use tokio::prelude::*;
+use futures::{SinkExt, StreamExt};
 use std::time::Instant;
 
 use hl7_mllp_codec::MllpCodec;

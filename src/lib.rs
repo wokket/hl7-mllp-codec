@@ -45,10 +45,10 @@
 //!	Ok(())
 //!}
 
-use bytes::buf::BufMut;
+use bytes::buf::{Buf, BufMut};
 use bytes::BytesMut;
 use log::{debug, trace};
-use tokio::codec::*;
+use tokio_util::codec::*;
 
 /// See the [crate] documentation for better details.
 #[derive(Default)]
@@ -132,7 +132,7 @@ impl Decoder for MllpCodec {
 		if let Some(start_offset) = src.iter().position(|b| *b == MllpCodec::BLOCK_HEADER) {
 			//yes we do, do we have a footer?
 
-			trace!("MLLP: Found message header at index {}", start_offset);
+			//trace!("MLLP: Found message header at index {}", start_offset);
 
 			if let Some(end_offset) = MllpCodec::get_footer_position(src) {
 				//TODO: Is it worth passing a slice of src so we don't search the header chars?
@@ -142,12 +142,12 @@ impl Decoder for MllpCodec {
 					.split_to(end_offset + 2) //get the footer bytes
 					.split_to(end_offset); // grab our data from the buffer, consuming (and losing) the footer
 				result.advance(start_offset + 1); //move to start of data
-				debug!("MLLP: Received message: {:?}", result);
+								  //debug!("MLLP: Received message: {:?}", result);
 				return Ok(Some(result));
 			}
 		}
 
-		trace!("MLLP: No clear header/footer available, waiting for more data.");
+		//trace!("MLLP: No clear header/footer available, waiting for more data.");
 		Ok(None) // no message lurking in here yet
 	}
 }
