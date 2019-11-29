@@ -4,54 +4,54 @@ extern crate test;
 #[cfg(test)]
 mod benchmarks {
 
-	use bytes::*;
-	use hl7_mllp_codec::MllpCodec;
-	use test::Bencher;
-	use tokio::codec::{Decoder, Encoder};
+    use bytes::*;
+    use hl7_mllp_codec::MllpCodec;
+    use test::Bencher;
+    use tokio_util::codec::{Decoder, Encoder};
 
-	#[bench]
-	fn bench_simple_decode(b: &mut Bencher) {
-		// this decodes the simplest message we could hope to receive (an ACK byte) to check overheads
-		let mut msg = BytesMut::from("\x06");
-		let mut codec = MllpCodec::new();
-		b.iter(|| {
-			let _response = codec.decode(&mut msg);
-		});
-	}
-	#[bench]
-	fn bench_real_message_decode(b: &mut Bencher) {
-		// this decodes a real message
-		let mut msg = BytesMut::from(format!("\x0B{}\x1C\x0D", get_hl7_message()));
-		let mut codec = MllpCodec::new();
-		b.iter(|| {
-			let _response = codec.decode(&mut msg);
-		});
-	}
+    #[bench]
+    fn bench_simple_decode(b: &mut Bencher) {
+        // this decodes the simplest message we could hope to receive (an ACK byte) to check overheads
+        let mut msg = BytesMut::from("\x06");
+        let mut codec = MllpCodec::new();
+        b.iter(|| {
+            let _response = codec.decode(&mut msg);
+        });
+    }
+    #[bench]
+    fn bench_real_message_decode(b: &mut Bencher) {
+        // this decodes a real message
+        let mut msg = BytesMut::from(format!("\x0B{}\x1C\x0D", get_hl7_message()).as_str());
+        let mut codec = MllpCodec::new();
+        b.iter(|| {
+            let _response = codec.decode(&mut msg);
+        });
+    }
 
-	#[bench]
-	fn bench_simple_encode(b: &mut Bencher) {
-		// this encodes the simplest message we could hope to send (an ACK byte) to check overheads
-		let mut codec = MllpCodec::new();
-		let mut buf = BytesMut::with_capacity(0); //0 default capacity, will need to grow, but doesn't seem to affect the time much
+    #[bench]
+    fn bench_simple_encode(b: &mut Bencher) {
+        // this encodes the simplest message we could hope to send (an ACK byte) to check overheads
+        let mut codec = MllpCodec::new();
+        let mut buf = BytesMut::with_capacity(0); //0 default capacity, will need to grow, but doesn't seem to affect the time much
 
-		b.iter(|| {
-			let msg = BytesMut::from("\x06");
-			let _response = codec.encode(msg, &mut buf);
-		});
-	}
+        b.iter(|| {
+            let msg = BytesMut::from("\x06");
+            let _response = codec.encode(msg, &mut buf);
+        });
+    }
 
-	// #[bench]
-	// fn bench_get_footer(b: &mut Bencher) {
-	// 	// this encodes the simplest message we could hope to send (an ACK byte) to check overheads
+    // #[bench]
+    // fn bench_get_footer(b: &mut Bencher) {
+    // 	// this encodes the simplest message we could hope to send (an ACK byte) to check overheads
 
-	// 	let msg = BytesMut::from(format!("\x0B{}\x1C\x0D", get_hl7_message()));
-	// 	b.iter(|| {
-	// 		let _response = MllpCodec::get_footer_position(&msg);
-	// 	});
-	// }
+    // 	let msg = BytesMut::from(format!("\x0B{}\x1C\x0D", get_hl7_message()));
+    // 	b.iter(|| {
+    // 		let _response = MllpCodec::get_footer_position(&msg);
+    // 	});
+    // }
 
-	fn get_hl7_message() -> &'static str {
-		const MSG: &str = r#"MSH|^~\&|LAB|MYFAC|LAB||201411130917||ORU^R01|3216598|D|2.3|||AL|NE|
+    fn get_hl7_message() -> &'static str {
+        const MSG: &str = r#"MSH|^~\&|LAB|MYFAC|LAB||201411130917||ORU^R01|3216598|D|2.3|||AL|NE|
 PID|1|ABC123DF|AND234DA_PID3|PID_4_ALTID|Patlast^Patfirst^Mid||19670202|F|||4505 21 st^^LAKE COUNTRY^BC^V4V 2S7||222-555-8484|||||MF0050356/15|
 PV1|1|O|MYFACSOMPL||||^Xavarie^Sonna^^^^^XAVS|||||||||||REF||SELF|||||||||||||||||||MYFAC||REG|||201411071440||||||||23390^PV1_52Surname^PV1_52Given^H^^Dr^^PV1_52Mnemonic|
 ORC|RE|PT103933301.0100|||CM|N|||201411130917|^Kyle^Andra^J.^^^^KYLA||^Xavarie^Sonna^^^^^XAVS|MYFAC|
@@ -73,6 +73,6 @@ OBX|14|NM|301.2900^Basophils^00065227^704-7^Basophils^pCLOCD|1|0.0|10\S\9/L|0.0-
 ZDR||^Xavarie^Sonna^^^^^XAVS^^^^^XX^^ATP|
 ZPR||"#;
 
-		return MSG;
-	}
+        return MSG;
+    }
 }
