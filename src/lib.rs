@@ -201,6 +201,14 @@ mod tests {
     }
 
     #[test]
+    fn missing_footer_detected(){
+        let data = BytesMut::from("no footer");
+        let result = MllpCodec::get_footer_position(&data);
+
+        assert_eq!(result, None);
+    }
+
+    #[test]
     fn ensure_decoder_finds_simple_message() {
         let mut data = wrap_for_mllp_mut("abcd");
         let mut m = MllpCodec::new();
