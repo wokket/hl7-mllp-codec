@@ -46,7 +46,7 @@
 //!}
 
 use bytes::buf::{Buf, BufMut};
-use bytes::BytesMut;
+use bytes::{BytesMut};
 use log::{debug, trace};
 use tokio_util::codec::*;
 
@@ -99,11 +99,11 @@ impl MllpCodec {
 
 // Support encoding data as an MLLP Frame.
 // This is used for both the primary HL7 message sent from a publisher, and also any ACK/NACK messages sent from a Listener.
-impl Encoder for MllpCodec {
-    type Item = BytesMut; // For the moment all we do is return the underlying byte array, I'm not getting into message parsing here.
+impl Encoder<BytesMut> for MllpCodec {
+    // For the moment all we do is return the underlying byte array, I'm not getting into message parsing here.
     type Error = std::io::Error; // Just to get rolling, custom error type later when needed.
 
-    fn encode(&mut self, event: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, event: BytesMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
         dst.reserve(event.len() + 3); //we need an extra 3 bytes of space on top of the message proper
         dst.put_u8(MllpCodec::BLOCK_HEADER); //header
 

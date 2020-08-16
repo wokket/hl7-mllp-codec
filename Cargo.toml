@@ -20,10 +20,14 @@ include = [
 
 [dependencies]
 bytes = "0.5"
-
-tokio-util = {version="0.2", features=["codec"]}
+tokio-util = {version="0.3", features=["codec"]}
 log = "0.4"
 
 [dev-dependencies]
-tokio = {version="0.2", features=["full"]}
+criterion = "0.3.3"
 futures = "0.3"
+tokio = {version="0.2", features=["full"]}
+
+[[bench]]
+name = "benchmarks"
+harness = false

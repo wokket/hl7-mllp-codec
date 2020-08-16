@@ -1,44 +1,41 @@
-#![feature(test)]
-extern crate test;
-
-#[cfg(test)]
-mod benchmarks {
 
     use bytes::*;
     use hl7_mllp_codec::MllpCodec;
-    use test::Bencher;
     use tokio_util::codec::{Decoder, Encoder};
+    use criterion::{criterion_group, criterion_main, Criterion};
 
-    #[bench]
-    fn bench_simple_decode(b: &mut Bencher) {
-        // this decodes the simplest message we could hope to receive (an ACK byte) to check overheads
-        let mut msg = BytesMut::from("\x06");
-        let mut codec = MllpCodec::new();
-        b.iter(|| {
-            let _response = codec.decode(&mut msg);
-        });
-    }
-    #[bench]
-    fn bench_real_message_decode(b: &mut Bencher) {
-        // this decodes a real message
-        let mut msg = BytesMut::from(format!("\x0B{}\x1C\x0D", get_hl7_message()).as_str());
-        let mut codec = MllpCodec::new();
-        b.iter(|| {
-            let _response = codec.decode(&mut msg);
-        });
-    }
+fn bench_simple_decode(c: &mut Criterion) {
+            // this decodes the simplest message we could hope to receive (an ACK byte) to check overheads
+            let mut msg = BytesMut::from("\x06");
+            let mut codec = MllpCodec::new();
+    
+    c.bench_function("Decode Ack", |b| b.iter(|| {
+        let _response = codec.decode(&mut msg);
+    }));
+}
 
-    #[bench]
-    fn bench_simple_encode(b: &mut Bencher) {
-        // this encodes the simplest message we could hope to send (an ACK byte) to check overheads
-        let mut codec = MllpCodec::new();
-        let mut buf = BytesMut::with_capacity(0); //0 default capacity, will need to grow, but doesn't seem to affect the time much
+fn bench_real_message_decode(c: &mut Criterion) {
+    // this decodes a real message
+    let mut msg = BytesMut::from(format!("\x0B{}\x1C\x0D", get_hl7_message()).as_str());
+    let mut codec = MllpCodec::new();
+    c.bench_function("Decode Real Message", |b| b.iter(|| {
+        let _response = codec.decode(&mut msg);
+    }));
+}
 
-        b.iter(|| {
-            let msg = BytesMut::from("\x06");
-            let _response = codec.encode(msg, &mut buf);
-        });
-    }
+fn bench_simple_encode(c: &mut Criterion) {
+    // this encodes the simplest message we could hope to send (an ACK byte) to check overheads
+    let mut codec = MllpCodec::new();
+    let mut buf = BytesMut::with_capacity(0); //0 default capacity, will need to grow, but doesn't seem to affect the time much
+    
+    c.bench_function("Encode Ack", |b| b.iter(|| {
+        let msg = BytesMut::from("\x06");
+        let _response = codec.encode(msg, &mut buf);
+    }));
+}
+
+criterion_group!(benches, bench_simple_decode, bench_real_message_decode, bench_simple_encode);
+criterion_main!(benches);
 
     // #[bench]
     // fn bench_get_footer(b: &mut Bencher) {
@@ -75,4 +72,3 @@ ZPR||"#;
 
         return MSG;
     }
-}
