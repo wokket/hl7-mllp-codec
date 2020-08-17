@@ -24,10 +24,11 @@ tokio-util = {version="0.3", features=["codec"]}
 log = "0.4"
 
 [dev-dependencies]
-criterion = "0.3.3"
+criterion = "0.3"
 futures = "0.3"
 tokio = {version="0.2", features=["full"]}
 
 [[bench]]
 name = "benchmarks"
 harness = false
+path = "benches/benchmarks.rs"
