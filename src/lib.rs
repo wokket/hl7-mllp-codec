@@ -15,7 +15,7 @@
 //! This is a highly simplified example, lifted from the Examples included in source control.
 //!
 //! ### Publisher
-//! ```
+//! ```no_run
 //!use bytes::*;
 //!use tokio;
 //!use tokio_util::codec::Framed;
