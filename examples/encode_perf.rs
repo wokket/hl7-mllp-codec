@@ -36,5 +36,5 @@ OBX|14|NM|301.2900^Basophils^00065227^704-7^Basophils^pCLOCD|1|0.0|10\S\9/L|0.0-
 ZDR||^Xavarie^Sonna^^^^^XAVS^^^^^XX^^ATP|
 ZPR||"#;
 
-    return MSG;
+    MSG
 }

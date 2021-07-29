@@ -1,7 +1,7 @@
 [package]
 name = "hl7-mllp-codec"
 description = "A Tokio codec for HL7 Minimal Lower Layer Message Transport protocol (MLLP)"
-version = "0.0.7"
+version = "0.1.0"
 authors = ["wokket <wokket@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -19,14 +19,14 @@ include = [
 # debug = true # Flamegraph love
 
 [dependencies]
-bytes = "0.5"
-tokio-util = {version="0.3", features=["codec"]}
+bytes = "1"
+tokio-util = {version="0.6.7", features=["codec"]}
 log = "0.4"
 
 [dev-dependencies]
 criterion = "0.3"
 futures = "0.3"
-tokio = {version="0.2", features=["full"]}
+tokio = {version="1.9.0", features=["full"]}
 
 [[bench]]
 name = "benchmarks"

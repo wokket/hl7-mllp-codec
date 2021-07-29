@@ -5,7 +5,6 @@ use bytes::*;
 use futures::{SinkExt, StreamExt};
 use hl7_mllp_codec::MllpCodec;
 use std::error::Error;
-use tokio;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 

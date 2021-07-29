@@ -8,7 +8,6 @@ use bytes::*;
 use futures::{SinkExt, StreamExt};
 use std::error::Error;
 use std::net::SocketAddr;
-use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::Framed;
 
@@ -17,7 +16,7 @@ use hl7_mllp_codec::MllpCodec;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let addr = "127.0.0.1:8080".parse::<SocketAddr>()?;
-    let mut listener = TcpListener::bind(&addr).await?;
+    let listener = TcpListener::bind(&addr).await?;
     println!("Listening on {}", addr);
 
     loop {

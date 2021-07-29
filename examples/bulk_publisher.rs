@@ -2,7 +2,6 @@
 use bytes::*;
 use futures::{SinkExt, StreamExt};
 use std::time::Instant;
-use tokio;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 
