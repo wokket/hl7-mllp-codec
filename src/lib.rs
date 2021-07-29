@@ -69,21 +69,19 @@ impl MllpCodec {
     }
 
     fn get_footer_position(src: &BytesMut) -> Option<usize> {
-        let mut iter = src.iter().rev().enumerate().peekable(); //search from end (footer should be right at the end)
+        let mut iter = src.iter().enumerate().peekable(); //search from start because we may have multiple messages on socket
         loop {
             let cur = iter.next();
             let next = iter.peek();
 
             match (cur, next) {
-                (Some((_, cur_ele)), Some((i, next_ele))) => {
+                (Some((i, cur_ele)), Some((_, next_ele))) => {
                     //both current and next ele are avail
-                    if cur_ele == &MllpCodec::BLOCK_FOOTER[1]
-                        && *next_ele == &MllpCodec::BLOCK_FOOTER[0]
+                    if cur_ele == &MllpCodec::BLOCK_FOOTER[0]
+                        && *next_ele == &MllpCodec::BLOCK_FOOTER[1]
                     {
-                        //if the bytes are our footer
-                        let index = src.len() - i - 1; //need an extra byte removed
-                        trace!("MLLP: Found footer at index {}", index);
-                        return Some(index);
+                        trace!("MLLP: Found footer at index {}", i);
+                        return Some(i);
                     }
                 }
                 (_, None) => {
