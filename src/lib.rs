@@ -293,4 +293,22 @@ mod tests {
             _ => panic!("Error decoding second message"),
         }
     }
+    #[test]
+    fn test_parsing_multiple_messages() {
+        let mut mllp = MllpCodec::new();
+        let mut data = wrap_for_mllp_mut("MSH|^~\\&|ZIS|1^AHospital|||200405141144||¶ADT^A01|20041104082400|P|2.3|||AL|NE|||8859/15|¶EVN|A01|20041104082400.0000+0100|20041104082400¶PID||\"\"|10||Vries^Danny^D.^^de||19951202|M|||Rembrandlaan^7^Leiden^^7301TH^\"\"^^P||\"\"|\"\"||\"\"|||||||\"\"|\"\"¶PV1||I|3w^301^\"\"^01|S|||100^van den Berg^^A.S.^^\"\"^dr|\"\"||9||||H||||20041104082400.0000+0100");
+        let bytes = data.clone().iter().map(|s| s.to_owned()).collect::<Vec<u8>>();
+        data.extend_from_slice(&bytes[..]);
+        data.extend_from_slice(&bytes[..]);
+        let result = mllp.decode(&mut data);
+        match result {
+            Ok(Some(message)) => {
+                // Ensure that a single message was parsed out correctly
+                assert_eq!(message.len(), 338);
+                // Check to make sure data is two messages and two encapsulations in size
+                assert_eq!(data.len(), (message.len() * 2) + 6);
+            }
+            _ => assert!(false),
+        }
+    }
 }
