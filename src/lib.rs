@@ -3,7 +3,7 @@
 //! HL7's MLLP is a simple, single-byte-text based protocol for framing HL7 messages over a TCP (or similar) transport.
 //! The full specification is available at [the HL7 site](https://www.hl7.org/documentcenter/private/standards/v3/V3_TRMLLP_R2_R2019.zip) (Note that they place the standards behind a free membership/login form).
 //!
-//! This crate provides a [Codec](https://docs.rs/tokio/0.2.0-alpha.6/tokio/codec/index.html) implementation
+//! This crate provides a [Codec](https://docs.rs/tokio/0.6.7/tokio/codec/index.html) implementation
 //! that encodes/decodes MLLP frames from a Tokio stream, allowing simple programmatic access to the messages (both
 //! primary and ack/nack).
 //!
@@ -43,7 +43,13 @@
 //!
 //!    Ok(())
 //!}
-
+//!```
+//!
+//! # Crate Features
+//! By default this crate is designed to strictly comply with the MLLP Specification, however there are scenarios where systems in production _do not_ comply with the standard.  In those cases there is a crate feature `noncompliance`
+//! available which enables some non-compliant behaviours:
+//! - Removes the assumption that there's only message at a time on the wire in the event that a publisher fails to wait for an ACK/NAK, and publishes multiple messages asyncronously
+//!
 use bytes::buf::{Buf, BufMut};
 use bytes::BytesMut;
 use log::{debug, trace};
@@ -323,35 +329,42 @@ mod tests {
             _ => panic!("Error decoding second message"),
         }
     }
-    #[test]
+
+    
+
     #[cfg(feature = "noncompliance")]
-    fn test_parsing_multiple_messages() {
-        let mut mllp = MllpCodec::new();
-        let mut data = wrap_for_mllp_mut("MSH|^~\\&|ZIS|1^AHospital|||200405141144||¶ADT^A01|20041104082400|P|2.3|||AL|NE|||8859/15|¶EVN|A01|20041104082400.0000+0100|20041104082400¶PID||\"\"|10||Vries^Danny^D.^^de||19951202|M|||Rembrandlaan^7^Leiden^^7301TH^\"\"^^P||\"\"|\"\"||\"\"|||||||\"\"|\"\"¶PV1||I|3w^301^\"\"^01|S|||100^van den Berg^^A.S.^^\"\"^dr|\"\"||9||||H||||20041104082400.0000+0100");
-        let bytes = data.clone().iter().map(|s| s.to_owned()).collect::<Vec<u8>>();
-        data.extend_from_slice(&bytes[..]);
-        data.extend_from_slice(&bytes[..]);
-        // Read first message
-        let result = mllp.decode(&mut data);
-        match result {
-            Ok(Some(message)) => {
-                // Ensure that a single message was parsed out correctly
-                assert_eq!(message.len(), 338);
-                // Check to make sure data is two messages and two encapsulations in size
-                assert_eq!(data.len(), (message.len() * 2) + 6);
+    mod noncompliance_tests {
+        use super::*;
+
+        #[test]
+        fn test_parsing_multiple_messages() {
+            let mut mllp = MllpCodec::new();
+            let mut data = wrap_for_mllp_mut("MSH|^~\\&|ZIS|1^AHospital|||200405141144||¶ADT^A01|20041104082400|P|2.3|||AL|NE|||8859/15|¶EVN|A01|20041104082400.0000+0100|20041104082400¶PID||\"\"|10||Vries^Danny^D.^^de||19951202|M|||Rembrandlaan^7^Leiden^^7301TH^\"\"^^P||\"\"|\"\"||\"\"|||||||\"\"|\"\"¶PV1||I|3w^301^\"\"^01|S|||100^van den Berg^^A.S.^^\"\"^dr|\"\"||9||||H||||20041104082400.0000+0100");
+            let bytes = data.clone().iter().map(|s| s.to_owned()).collect::<Vec<u8>>();
+            data.extend_from_slice(&bytes[..]);
+            data.extend_from_slice(&bytes[..]);
+            // Read first message
+            let result = mllp.decode(&mut data);
+            match result {
+                Ok(Some(message)) => {
+                    // Ensure that a single message was parsed out correctly
+                    assert_eq!(message.len(), 338);
+                    // Check to make sure data is two messages and two encapsulations in size
+                    assert_eq!(data.len(), (message.len() * 2) + 6);
+                }
+                _ => assert!(false),
             }
-            _ => assert!(false),
-        }
-        // Read second message
-        let result = mllp.decode(&mut data);
-        match result {
-            Ok(Some(message)) => {
-                // Ensure that a single message was parsed out correctly
-                assert_eq!(message.len(), 338);
-                // Check to make sure remaining data is the size of the message and encap
-                assert_eq!(data.len(), message.len() + 3);
+            // Read second message
+            let result = mllp.decode(&mut data);
+            match result {
+                Ok(Some(message)) => {
+                    // Ensure that a single message was parsed out correctly
+                    assert_eq!(message.len(), 338);
+                    // Check to make sure remaining data is the size of the message and encap
+                    assert_eq!(data.len(), message.len() + 3);
+                }
+                _ => assert!(false),
             }
-            _ => assert!(false),
         }
     }
 }
