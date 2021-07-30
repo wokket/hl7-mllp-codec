@@ -300,6 +300,7 @@ mod tests {
         let bytes = data.clone().iter().map(|s| s.to_owned()).collect::<Vec<u8>>();
         data.extend_from_slice(&bytes[..]);
         data.extend_from_slice(&bytes[..]);
+        // Read first message
         let result = mllp.decode(&mut data);
         match result {
             Ok(Some(message)) => {
@@ -307,6 +308,17 @@ mod tests {
                 assert_eq!(message.len(), 338);
                 // Check to make sure data is two messages and two encapsulations in size
                 assert_eq!(data.len(), (message.len() * 2) + 6);
+            }
+            _ => assert!(false),
+        }
+        // Read second message
+        let result = mllp.decode(&mut data);
+        match result {
+            Ok(Some(message)) => {
+                // Ensure that a single message was parsed out correctly
+                assert_eq!(message.len(), 338);
+                // Check to make sure remaining data is the size of the message and encap
+                assert_eq!(data.len(), message.len() + 3);
             }
             _ => assert!(false),
         }
