@@ -57,7 +57,7 @@ impl MllpCodec {
     const BLOCK_HEADER: u8 = 0x0B; //Vertical-Tab char, the marker for the start of a message
     const BLOCK_FOOTER: [u8; 2] = [0x1C, 0x0D]; //File-Separator char + CR, the marker for the end of a message
 
-    /// Creates a new Codec instance, generally for use within a [Tokio Framed](https://docs.rs/tokio/0.2.0-alpha.6/tokio/codec/struct.Framed.html),
+    /// Creates a new Codec instance, generally for use within a [Tokio Framed](https://docs.rs/tokio-util/0.6.7/tokio_util/codec/struct.Framed.html),
     /// but can be instantiated standalone for testing purposes etc.
     /// Example:
     /// ```
@@ -68,6 +68,7 @@ impl MllpCodec {
         MllpCodec {}
     }
 
+    #[cfg(feature = "noncompliance")]
     fn get_footer_position(src: &BytesMut) -> Option<usize> {
         let mut iter = src.iter().enumerate().peekable(); //search from start because we may have multiple messages on socket
         loop {
@@ -82,6 +83,35 @@ impl MllpCodec {
                     {
                         trace!("MLLP: Found footer at index {}", i);
                         return Some(i);
+                    }
+                }
+                (_, None) => {
+                    trace!("MLLP: Unable to find footer...");
+                    return None;
+                }
+                _ => {} //keep looping
+            }
+        }
+    }
+
+    /// this is the spec-compliant version, that knows there can only be at most one message in the buffer due to the synchronous nature of the spec
+    #[cfg(not(feature = "noncompliance"))] 
+    fn get_footer_position(src: &BytesMut) -> Option<usize> {
+        let mut iter = src.iter().rev().enumerate().peekable(); //search from end (footer should be right at the end)
+        loop {
+            let cur = iter.next();
+            let next = iter.peek();
+
+            match (cur, next) {
+                (Some((_, cur_ele)), Some((i, next_ele))) => {
+                    //both current and next ele are avail
+                    if cur_ele == &MllpCodec::BLOCK_FOOTER[1]
+                        && *next_ele == &MllpCodec::BLOCK_FOOTER[0]
+                    {
+                        //if the bytes are our footer
+                        let index = src.len() - i - 1; //need an extra byte removed
+                        trace!("MLLP: Found footer at index {}", index);
+                        return Some(index);
                     }
                 }
                 (_, None) => {
@@ -294,6 +324,7 @@ mod tests {
         }
     }
     #[test]
+    #[cfg(feature = "noncompliance")]
     fn test_parsing_multiple_messages() {
         let mut mllp = MllpCodec::new();
         let mut data = wrap_for_mllp_mut("MSH|^~\\&|ZIS|1^AHospital|||200405141144||¶ADT^A01|20041104082400|P|2.3|||AL|NE|||8859/15|¶EVN|A01|20041104082400.0000+0100|20041104082400¶PID||\"\"|10||Vries^Danny^D.^^de||19951202|M|||Rembrandlaan^7^Leiden^^7301TH^\"\"^^P||\"\"|\"\"||\"\"|||||||\"\"|\"\"¶PV1||I|3w^301^\"\"^01|S|||100^van den Berg^^A.S.^^\"\"^dr|\"\"||9||||H||||20041104082400.0000+0100");

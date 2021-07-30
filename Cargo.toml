@@ -15,8 +15,9 @@ include = [
     "Cargo.toml",
 ]
 
-# [profile.release]
-# debug = true # Flamegraph love
+[features]
+# Enables non-spec compliant behaviours, because why follow a standard built around interoperability... :(
+noncompliance = []
 
 [dependencies]
 bytes = "1"
