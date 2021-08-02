@@ -14,5 +14,9 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
+      
+    - name: Run tests (spec-compliant)
       run: cargo test --verbose
+
+    - name: Run tests (noncompliant feature)
+      run: cargo test --verbose --features noncompliance
