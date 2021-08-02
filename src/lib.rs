@@ -1,55 +1,58 @@
-//! # A tokio codec implementation for the HL7 MLLP network protocol.
-//!
-//! HL7's MLLP is a simple, single-byte-text based protocol for framing HL7 messages over a TCP (or similar) transport.
-//! The full specification is available at [the HL7 site](https://www.hl7.org/documentcenter/private/standards/v3/V3_TRMLLP_R2_R2019.zip) (Note that they place the standards behind a free membership/login form).
-//!
-//! This crate provides a [Codec](https://docs.rs/tokio/0.6.7/tokio/codec/index.html) implementation
-//! that encodes/decodes MLLP frames from a Tokio stream, allowing simple programmatic access to the messages (both
-//! primary and ack/nack).
-//!
-//! Tokio (and the rust async ecosystem) is currently in a state of flux, however there are two simple (not production ready!) examples in the source, of
-//! both a publisher and a listener. NB. These examples just write output to the console, and this can seriously limit throughput.  If you want to run
-//! some simple perf tests with the samples, ensure you minimise the amount of data written out.
-//!
-//! ## Example
-//! This is a highly simplified example, lifted from the Examples included in source control.
-//!
-//! ### Publisher
-//! ```no_run
-//!use bytes::*;
-//!use tokio_util::codec::Framed;
-//!use tokio::net::TcpStream;
-//!use futures::{SinkExt, StreamExt};
-//!
-//!use hl7_mllp_codec::MllpCodec;
-//!
-//!#[tokio::main]
-//!async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!    // Open a TCP stream to the socket address.
-//!    let stream = TcpStream::connect("127.0.0.1:8080").await?;
-//!
-//!    // Construct a MLLP transport using our codec
-//!    let mut transport = Framed::new(stream, MllpCodec::new());
-//!
-//!    // Send some bytes wrapped in MLLP (Note: not a valid HL7 message)
-//!    transport.send(BytesMut::from("Hello World")).await?; //because this is through the codec it gets wrapped in MLLP header/footer for us
-//!
-//!    if let Some(response) = transport.next().await {
-//!        match response{
-//!            Ok(msg) => println!("  Received response: {:?}", msg),
-//!            Err(e) => println!("  ERROR: {:?}", e)
-//!        }
-//!    }
-//!
-//!    Ok(())
-//!}
-//!```
-//!
-//! # Crate Features
-//! By default this crate is designed to strictly comply with the MLLP Specification, however there are scenarios where systems in production _do not_ comply with the standard.  In those cases there is a crate feature `noncompliance`
-//! available which enables some non-compliant behaviours:
-//! - Removes the assumption that there's only message at a time on the wire in the event that a publisher fails to wait for an ACK/NAK, and publishes multiple messages asyncronously
-//!
+/*! 
+# A tokio codec implementation for the HL7 MLLP network protocol.
+
+ HL7's MLLP is a simple, single-byte-text based protocol for framing HL7 messages over a TCP (or similar) transport.
+ The full specification is available at [the HL7 site](https://www.hl7.org/documentcenter/private/standards/v3/V3_TRMLLP_R2_R2019.zip) (Note that they place the standards behind a free membership/login form).
+
+ This crate provides a [Codec](https://docs.rs/tokio/0.6.7/tokio/codec/index.html) implementation
+ that encodes/decodes MLLP frames from a Tokio stream, allowing simple programmatic access to the messages (both
+ primary and ack/nack).
+
+ Tokio (and the rust async ecosystem) is currently in a state of flux, however there are two simple (not production ready!) examples in the source, of
+ both a publisher and a listener. NB. These examples just write output to the console, and this can seriously limit throughput.  If you want to run
+ some simple perf tests with the samples, ensure you minimise the amount of data written out.
+
+ ## Example
+ This is a highly simplified example, lifted from the Examples included in source control.
+
+ ### Publisher
+ ```no_run
+use bytes::*;
+use tokio_util::codec::Framed;
+use tokio::net::TcpStream;
+use futures::{SinkExt, StreamExt};
+
+use hl7_mllp_codec::MllpCodec;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Open a TCP stream to the socket address.
+    let stream = TcpStream::connect("127.0.0.1:8080").await?;
+
+    // Construct a MLLP transport using our codec
+    let mut transport = Framed::new(stream, MllpCodec::new());
+
+    // Send some bytes wrapped in MLLP (Note: not a valid HL7 message)
+    transport.send(BytesMut::from("Hello World")).await?; //because this is through the codec it gets wrapped in MLLP header/footer for us
+
+    if let Some(response) = transport.next().await {
+        match response{
+            Ok(msg) => println!("  Received response: {:?}", msg),
+            Err(e) => println!("  ERROR: {:?}", e)
+        }
+    }
+
+    Ok(())
+}
+```
+
+ # Crate Features
+ By default this crate is designed to strictly comply with the MLLP Specification, however there are scenarios where systems in production _do not_ comply with the standard.  In those cases there is a crate feature `noncompliance`
+ available which enables some non-compliant behaviours:
+ - Removes the assumption that there's only message at a time on the wire in the event that a publisher fails to wait for an ACK/NAK, and publishes multiple messages asyncronously
+
+ */
+
 use bytes::buf::{Buf, BufMut};
 use bytes::BytesMut;
 use log::{debug, trace};
