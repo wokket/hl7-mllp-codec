@@ -184,18 +184,18 @@ impl Decoder for MllpCodec {
             decode_internal(&mut self.buffer)
         };
 
-       match result {
-        Ok(None) if self.buffer.len() == 0 => { //if there's already data in the buffer we concatted it above, no need to do so again
-            // if here we need to concat the src buffer locally for future calls...
+       
+        if let Ok(None) = result { // we didn't find a message
+            if self.buffer.len() == 0 { // if there's already data in the buffer we concatted it above, no need to do so again
+                    // if here we need to concat the src buffer locally for future calls...
 
-            self.buffer.reserve(src.len());
-            self.buffer.put_slice(src);
-            src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy, but breaks the non-compliant variant that can have multiple messages in the buffer
-        },
-        _ => return result //Error or Ok(Some(result))
-       }
+                    self.buffer.reserve(src.len());
+                    self.buffer.put_slice(src);
+                    src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy, but breaks the non-compliant variant that can have multiple messages in the buffer
+            }
+        }
 
-       Ok(None) // no message lurking in here yet
+        result
     }
 }
 
