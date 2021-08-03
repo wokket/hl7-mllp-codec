@@ -78,7 +78,9 @@ impl MllpCodec {
     /// let mllp = MllpCodec::new();
     /// ```
     pub fn new() -> Self {
-        MllpCodec { buffer: BytesMut::new() }
+        MllpCodec {
+            buffer: BytesMut::new(), //default to new, empty buffer.  TODO: Is Option<BytesMut> any more efficient?
+        }
     }
 
     #[cfg(feature = "noncompliance")]
@@ -110,7 +112,7 @@ impl MllpCodec {
     /// this is the spec-compliant version, that knows there can only be at most one message in the buffer due to the synchronous nature of the spec
     #[cfg(not(feature = "noncompliance"))]
     fn get_footer_position(src: &BytesMut) -> Option<usize> {
-        let mut iter = src.iter().rev().enumerate().peekable(); //search from end (footer should be right at the end)
+        let mut iter = src.iter().rev().enumerate().peekable(); //search from end (footer should be right at the end per spec)
         loop {
             let cur = iter.next();
             let next = iter.peek();
@@ -140,7 +142,6 @@ impl MllpCodec {
 // Support encoding data as an MLLP Frame.
 // This is used for both the primary HL7 message sent from a publisher, and also any ACK/NACK messages sent from a Listener.
 impl Encoder<BytesMut> for MllpCodec {
-    // For the moment all we do is return the underlying byte array, I'm not getting into message parsing here.
     type Error = std::io::Error; // Just to get rolling, custom error type later when needed.
 
     fn encode(&mut self, event: BytesMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
@@ -168,37 +169,61 @@ impl Decoder for MllpCodec {
 
         // we DO have to ignore any bytes prior to the BLOCK_HEADER per the spec
 
-        // Always read the entire src into our local buffer for simplicity
-        // TODO: remove unecessary copying later as this has regressed perf over 200%
-        self.buffer.reserve(src.len());
-        self.buffer.put_slice(src); 
-        src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy
-        
+        // If we don't have anything outstanding from a previous call just use the buffer passed in
+        let result = if self.buffer.len() == 0 {
+            trace!("Empty local buffer, operating on passed buffer only");
+            decode_internal(src)
 
-        //do we have a BLOCK_HEADER?
-        if let Some(start_offset) = self.buffer.iter().position(|b| *b == MllpCodec::BLOCK_HEADER) {
-            //yes we do, do we have a footer?
+        } else {
+            // otherwise concat the previous data and current and work on that
+            self.buffer.reserve(src.len());
+            self.buffer.put_slice(src);
+            src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy, but breaks the non-compliant variant that can have multiple messages in the buffer
 
-            //trace!("MLLP: Found message header at index {}", start_offset);
+            trace!("Operating on concat of previous and current buffers");
+            decode_internal(&mut self.buffer)
+        };
 
-            if let Some(end_offset) = MllpCodec::get_footer_position(&self.buffer) {
-                //Is it worth passing a slice of src so we don't search the header chars?
-                //Most of the time the start_offset == 0, so not sure it's worth it.
+       match result {
+        Ok(None) if self.buffer.len() == 0 => { //if there's already data in the buffer we concatted it above, no need to do so again
+            // if here we need to concat the src buffer locally for future calls...
 
-                let mut result = self.buffer
-                    .split_to(end_offset + 2) //get the footer bytes
-                    .split_to(end_offset); // grab our data from the buffer, consuming (and losing) the footer
-                result.advance(start_offset + 1); //move to start of data
+            self.buffer.reserve(src.len());
+            self.buffer.put_slice(src);
+            src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy, but breaks the non-compliant variant that can have multiple messages in the buffer
+        },
+        _ => return result //Error or Ok(Some(result))
+       }
 
-                
-
-                return Ok(Some(result));
-            }
-        }
-
-        //trace!("MLLP: No clear header/footer available, waiting for more data.");
-        Ok(None) // no message lurking in here yet
+       Ok(None) // no message lurking in here yet
     }
+}
+
+fn decode_internal(buf_to_process: &mut BytesMut) -> Result<Option<BytesMut>, std::io::Error> {
+    
+    if let Some(start_offset) = buf_to_process
+        .iter()
+        .position(|b| *b == MllpCodec::BLOCK_HEADER)
+    {
+        //yes we do, do we have a footer?
+
+        //trace!("MLLP: Found message header at index {}", start_offset);
+
+        if let Some(end_offset) = MllpCodec::get_footer_position(buf_to_process) {
+            //Is it worth passing a slice of src so we don't search the header chars?
+            //Most of the time the start_offset == 0, so not sure it's worth it.
+
+            let mut result = buf_to_process
+                .split_to(end_offset + 2) //get the footer bytes
+                .split_to(end_offset); // grab our data from the buffer, consuming (and losing) the footer
+
+            result.advance(start_offset + 1); //move to start of data
+
+            return Ok(Some(result));
+        }
+    }
+
+    Ok(None)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -354,13 +379,14 @@ mod tests {
         let mut call2 = BytesMut::from(" Data\x1C\x0D");
 
         match mllp.decode(&mut call1) {
-            Ok(None) => debug!("Hooray!"), //NOP 
-            _ => panic!("Data returned from call to data without footer!")
+            Ok(None) => debug!("Hooray!"), //NOP
+            _ => panic!("Data returned from call to data without footer!"),
         }
-                
+
         match mllp.decode(&mut call2) {
             Ok(Some(message)) => assert_eq!(&message[..], b"Test Data"),
-            _ => panic!("Unexpected result when decoding split packets")
+            Ok(None) => panic!("decode didn't find a message on the second call..."),
+            Err(err) => panic!("Unexpected error when decoding split packets: {:?}", err),
         }
     }
 
