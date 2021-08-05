@@ -372,7 +372,7 @@ mod tests {
     }
 
     #[test]
-    fn test_message_split_over_multiple_calls() {
+    fn test_message_split_over_two_calls() {
         // ensure data split over multiple calls to decode is interpreted correctly (#4)
         let mut mllp = MllpCodec::new();
         let mut call1 = BytesMut::from("\x0BTest");
@@ -386,6 +386,31 @@ mod tests {
         match mllp.decode(&mut call2) {
             Ok(Some(message)) => assert_eq!(&message[..], b"Test Data"),
             Ok(None) => panic!("decode didn't find a message on the second call..."),
+            Err(err) => panic!("Unexpected error when decoding split packets: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_message_split_over_multiple_calls() {
+        // ensure data split over multiple calls to decode is interpreted correctly (#4)
+        let mut mllp = MllpCodec::new();
+        let mut call1 = BytesMut::from("\x0BTest");
+        let mut call2 = BytesMut::from(" Data");
+        let mut call3 = BytesMut::from(" Here\x1C\x0D");
+
+        match mllp.decode(&mut call1) {
+            Ok(None) => debug!("Hooray!"), //NOP
+            _ => panic!("Data returned from call to decode() without footer!"),
+        }
+
+        match mllp.decode(&mut call2) {
+            Ok(None) => debug!("Hooray!"), //NOP
+            _ => panic!("Data returned from call to decode() without footer!"),
+        }
+
+        match mllp.decode(&mut call3) {
+            Ok(Some(message)) => assert_eq!(&message[..], b"Test Data Here"),
+            Ok(None) => panic!("decode didn't find a message on the third call..."),
             Err(err) => panic!("Unexpected error when decoding split packets: {:?}", err),
         }
     }
