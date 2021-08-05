@@ -63,7 +63,7 @@ use tokio_util::codec::*;
 pub struct MllpCodec {
     // If we receive the start of a message in a call to decode but not the end, we need to buffer the content
     // and prepend it to the data in the next call (Issue #4)
-    buffer: Option<BytesMut>,
+    buffer: BytesMut,
 }
 
 impl MllpCodec {
@@ -79,7 +79,7 @@ impl MllpCodec {
     /// ```
     pub fn new() -> Self {
         MllpCodec {
-            buffer: None, //lazy init, only instantiate if needed...
+            buffer: BytesMut::new()
         }
     }
 
@@ -169,37 +169,29 @@ impl Decoder for MllpCodec {
 
         // we DO have to ignore any bytes prior to the BLOCK_HEADER per the spec
 
-        let buf = self.buffer.as_ref();
-
         // If we don't have anything outstanding from a previous call just use the buffer passed in
-        let result = if buf == None || buf.unwrap().is_empty() {
+        let result = if self.buffer.is_empty() {
             trace!("Empty local buffer, operating on passed buffer only");
             decode_internal(src)
         } else {
             // otherwise concat the previous data and current and work on that
-            let buf = self.buffer.get_or_insert_with(|| BytesMut::with_capacity(src.len()));
-
-            buf.put_slice(src);
+            self.buffer.reserve(src.len());
+            self.buffer.put_slice(src);
             src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy
 
             trace!("Operating on concat of previous and current buffers");
-            decode_internal(buf)
+            decode_internal(&mut self.buffer)
         };
 
         if let Ok(None) = result {
             // we didn't find a message
 
-            // lazy init if needed
-            let buffer = self
-                .buffer
-                .get_or_insert_with(|| BytesMut::with_capacity(src.len()));
-
-            if buffer.is_empty() {
+            if self.buffer.is_empty() {
                 // if there's already data in the buffer we concatted it above, no need to do so again
                 // if here we need to concat the src buffer locally for future calls...
 
-                buffer.reserve(src.len());
-                buffer.put_slice(src);
+                self.buffer.reserve(src.len());
+                self.buffer.put_slice(src);
                 src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy, but breaks the non-compliant variant that can have multiple messages in the buffer
             }
         }
