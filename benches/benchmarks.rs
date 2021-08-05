@@ -5,23 +5,27 @@ use tokio_util::codec::{Decoder, Encoder};
 
 fn bench_simple_decode(c: &mut Criterion) {
     // this decodes the simplest message we could hope to receive (an ACK byte) to check overheads
-    let mut msg = BytesMut::from("\x06");
+    let msg = BytesMut::from("\x0B\x06\x1C\x0D");
     let mut codec = MllpCodec::new();
 
     c.bench_function("Decode Ack", |b| {
         b.iter(|| {
-            let _response = codec.decode(&mut msg);
+            let _response = codec.decode(&mut msg.clone());
+            /*match _response {
+                Ok(Some(m)) => assert_eq!(m.len(), 1),
+                _ => panic!("Benchmark iter not doing correct work!")
+            }*/
         })
     });
 }
 
 fn bench_real_message_decode(c: &mut Criterion) {
     // this decodes a real message
-    let mut msg = BytesMut::from(format!("\x0B{}\x1C\x0D", get_hl7_message()).as_str());
+    let msg = BytesMut::from(format!("\x0B{}\x1C\x0D", get_hl7_message()).as_str());
     let mut codec = MllpCodec::new();
     c.bench_function("Decode Real Message", |b| {
         b.iter(|| {
-            let _response = codec.decode(&mut msg);
+            let _response = codec.decode(&mut msg.clone());
         })
     });
 }
