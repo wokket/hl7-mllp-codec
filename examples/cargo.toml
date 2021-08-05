@@ -5,5 +5,5 @@ publish = false
 edition = "2018"
 
 [dev-dependencies]
-hl7-mllp-codec = {version ="0.1.0" path="../src/lib.rs"}
-tokio = "0.2"
+hl7-mllp-codec = {version ="0.2" path="../src/lib.rs"}
+tokio = "1.9"

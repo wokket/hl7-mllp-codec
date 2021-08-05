@@ -1,4 +1,4 @@
-/*! 
+/*!
 # A tokio codec implementation for the HL7 MLLP network protocol.
 
  HL7's MLLP is a simple, single-byte-text based protocol for framing HL7 messages over a TCP (or similar) transport.
@@ -60,7 +60,11 @@ use tokio_util::codec::*;
 
 /// See the [crate] documentation for better details.
 #[derive(Default)]
-pub struct MllpCodec {}
+pub struct MllpCodec {
+    // If we receive the start of a message in a call to decode but not the end, we need to buffer the content
+    // and prepend it to the data in the next call (Issue #4)
+    buffer: BytesMut,
+}
 
 impl MllpCodec {
     const BLOCK_HEADER: u8 = 0x0B; //Vertical-Tab char, the marker for the start of a message
@@ -74,7 +78,9 @@ impl MllpCodec {
     /// let mllp = MllpCodec::new();
     /// ```
     pub fn new() -> Self {
-        MllpCodec {}
+        MllpCodec {
+            buffer: BytesMut::new()
+        }
     }
 
     #[cfg(feature = "noncompliance")]
@@ -104,9 +110,9 @@ impl MllpCodec {
     }
 
     /// this is the spec-compliant version, that knows there can only be at most one message in the buffer due to the synchronous nature of the spec
-    #[cfg(not(feature = "noncompliance"))] 
+    #[cfg(not(feature = "noncompliance"))]
     fn get_footer_position(src: &BytesMut) -> Option<usize> {
-        let mut iter = src.iter().rev().enumerate().peekable(); //search from end (footer should be right at the end)
+        let mut iter = src.iter().rev().enumerate().peekable(); //search from end (footer should be right at the end per spec)
         loop {
             let cur = iter.next();
             let next = iter.peek();
@@ -136,7 +142,6 @@ impl MllpCodec {
 // Support encoding data as an MLLP Frame.
 // This is used for both the primary HL7 message sent from a publisher, and also any ACK/NACK messages sent from a Listener.
 impl Encoder<BytesMut> for MllpCodec {
-    // For the moment all we do is return the underlying byte array, I'm not getting into message parsing here.
     type Error = std::io::Error; // Just to get rolling, custom error type later when needed.
 
     fn encode(&mut self, event: BytesMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
@@ -160,32 +165,65 @@ impl Decoder for MllpCodec {
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // We're lucky the MLLP is specced as synchronous, and requires an ACK before sending the
-        // next message, so we don't have to worry about multiple messages in the buffer.
+        // next message, so we don't have to worry about multiple messages in the buffer (Edit: See the `noncompliance` feature flag for unpleasantness).
 
-        // we DO have to ignore any bytes prior to the BLOCK_HEADER
+        // we DO have to ignore any bytes prior to the BLOCK_HEADER per the spec
 
-        //do we have a BLOCK_HEADER?
-        if let Some(start_offset) = src.iter().position(|b| *b == MllpCodec::BLOCK_HEADER) {
-            //yes we do, do we have a footer?
+        // If we don't have anything outstanding from a previous call just use the buffer passed in
+        let result = if self.buffer.is_empty() {
+            trace!("Empty local buffer, operating on passed buffer only");
+            decode_internal(src)
+        } else {
+            // otherwise concat the previous data and current and work on that
+            self.buffer.reserve(src.len());
+            self.buffer.put_slice(src);
+            src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy
 
-            //trace!("MLLP: Found message header at index {}", start_offset);
+            trace!("Operating on concat of previous and current buffers");
+            decode_internal(&mut self.buffer)
+        };
 
-            if let Some(end_offset) = MllpCodec::get_footer_position(src) {
-                //TODO: Is it worth passing a slice of src so we don't search the header chars?
-                //Most of the time the start_offset == 0, so not sure it's worth it.
+        if let Ok(None) = result {
+            // we didn't find a message
 
-                let mut result = src
-                    .split_to(end_offset + 2) //get the footer bytes
-                    .split_to(end_offset); // grab our data from the buffer, consuming (and losing) the footer
-                result.advance(start_offset + 1); //move to start of data
-                                                  //debug!("MLLP: Received message: {:?}", result);
-                return Ok(Some(result));
+            if self.buffer.is_empty() {
+                // if there's already data in the buffer we concatted it above, no need to do so again
+                // if here we need to concat the src buffer locally for future calls...
+
+                self.buffer.reserve(src.len());
+                self.buffer.put_slice(src);
+                src.advance(src.len()); // this consumes the whole src buffer and keeps tokio happy, but breaks the non-compliant variant that can have multiple messages in the buffer
             }
         }
 
-        //trace!("MLLP: No clear header/footer available, waiting for more data.");
-        Ok(None) // no message lurking in here yet
+        result
     }
+}
+
+fn decode_internal(buf_to_process: &mut BytesMut) -> Result<Option<BytesMut>, std::io::Error> {
+    if let Some(start_offset) = buf_to_process
+        .iter()
+        .position(|b| *b == MllpCodec::BLOCK_HEADER)
+    {
+        //yes we do, do we have a footer?
+
+        //trace!("MLLP: Found message header at index {}", start_offset);
+
+        if let Some(end_offset) = MllpCodec::get_footer_position(buf_to_process) {
+            //Is it worth passing a slice of src so we don't search the header chars?
+            //Most of the time the start_offset == 0, so not sure it's worth it.
+
+            let mut result = buf_to_process
+                .split_to(end_offset + 2) //get the footer bytes
+                .split_to(end_offset); // grab our data from the buffer, consuming (and losing) the footer
+
+            result.advance(start_offset + 1); //move to start of data
+
+            return Ok(Some(result));
+        }
+    }
+
+    Ok(None)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -333,7 +371,49 @@ mod tests {
         }
     }
 
-    
+    #[test]
+    fn test_message_split_over_two_calls() {
+        // ensure data split over multiple calls to decode is interpreted correctly (#4)
+        let mut mllp = MllpCodec::new();
+        let mut call1 = BytesMut::from("\x0BTest");
+        let mut call2 = BytesMut::from(" Data\x1C\x0D");
+
+        match mllp.decode(&mut call1) {
+            Ok(None) => debug!("Hooray!"), //NOP
+            _ => panic!("Data returned from call to data without footer!"),
+        }
+
+        match mllp.decode(&mut call2) {
+            Ok(Some(message)) => assert_eq!(&message[..], b"Test Data"),
+            Ok(None) => panic!("decode didn't find a message on the second call..."),
+            Err(err) => panic!("Unexpected error when decoding split packets: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_message_split_over_multiple_calls() {
+        // ensure data split over multiple calls to decode is interpreted correctly (#4)
+        let mut mllp = MllpCodec::new();
+        let mut call1 = BytesMut::from("\x0BTest");
+        let mut call2 = BytesMut::from(" Data");
+        let mut call3 = BytesMut::from(" Here\x1C\x0D");
+
+        match mllp.decode(&mut call1) {
+            Ok(None) => debug!("Hooray!"), //NOP
+            _ => panic!("Data returned from call to decode() without footer!"),
+        }
+
+        match mllp.decode(&mut call2) {
+            Ok(None) => debug!("Hooray!"), //NOP
+            _ => panic!("Data returned from call to decode() without footer!"),
+        }
+
+        match mllp.decode(&mut call3) {
+            Ok(Some(message)) => assert_eq!(&message[..], b"Test Data Here"),
+            Ok(None) => panic!("decode didn't find a message on the third call..."),
+            Err(err) => panic!("Unexpected error when decoding split packets: {:?}", err),
+        }
+    }
 
     #[cfg(feature = "noncompliance")]
     mod noncompliance_tests {
@@ -343,7 +423,11 @@ mod tests {
         fn test_parsing_multiple_messages() {
             let mut mllp = MllpCodec::new();
             let mut data = wrap_for_mllp_mut("MSH|^~\\&|ZIS|1^AHospital|||200405141144||¶ADT^A01|20041104082400|P|2.3|||AL|NE|||8859/15|¶EVN|A01|20041104082400.0000+0100|20041104082400¶PID||\"\"|10||Vries^Danny^D.^^de||19951202|M|||Rembrandlaan^7^Leiden^^7301TH^\"\"^^P||\"\"|\"\"||\"\"|||||||\"\"|\"\"¶PV1||I|3w^301^\"\"^01|S|||100^van den Berg^^A.S.^^\"\"^dr|\"\"||9||||H||||20041104082400.0000+0100");
-            let bytes = data.clone().iter().map(|s| s.to_owned()).collect::<Vec<u8>>();
+            let bytes = data
+                .clone()
+                .iter()
+                .map(|s| s.to_owned())
+                .collect::<Vec<u8>>();
             data.extend_from_slice(&bytes[..]);
             data.extend_from_slice(&bytes[..]);
             // Read first message
